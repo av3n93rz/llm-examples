@@ -1,15 +1,33 @@
 version: "3"
 
 services:
+  postgres:
+    container_name: postgres
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: db
+    build:
+      context: ./backend/db
+      dockerfile: Dockerfile
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     env_file:
       - .env
-    networks:
-      - default
+    environment:
+      POSTGRES_URL: postgres://postgres:postgres@postgres:5432/db
     ports:
       - 8000:$API_PORT
     build:
       context: ./backend
       dockerfile: Dockerfile
-networks:
-  default:
+    depends_on:
+      postgres:
+        condition: service_healthy
