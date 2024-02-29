@@ -1,0 +1,36 @@
+name: Build Frontend
+on:
+  pull_request:
+    branches:
+      - "main"
+    paths:
+      - "frontend/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: frontend/node_modules
+          key: node_modules-${{hashFiles('package-lock.json')}}
+          restore-keys: node_modules- # Take any latest cache if failed to find it
+
+      - name: Install node modules
+        working-directory: ${{ env.working-directory }}
+        run: npm i
+
+      - name: Run Build
+        working-directory: ${{ env.working-directory }}
+        run: npm run build
