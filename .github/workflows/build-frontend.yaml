@@ -12,6 +12,7 @@ jobs:
     timeout-minutes: 10
     env:
       working-directory: frontend
+      API_PORT: 8000
     steps:
       - uses: actions/checkout@v4
 
