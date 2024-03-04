@@ -22,6 +22,11 @@ COPY . .
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
+ARG AUTH0_SECRET
+ARG AUTH0_CLIENT_SECRET
+ENV AUTH0_SECRET=$AUTH0_SECRET
+ENV AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET
+
 RUN npm run build
 
 # Production image, copy all the files and run next

@@ -9,7 +9,10 @@ import { MessageMapper } from '../Message/MessageMapper';
 import { ScrollFade } from '../ScrollFade';
 
 const scrollToLastChatMessage = (element: HTMLDivElement | null) => {
-  element?.scrollIntoView({ behavior: 'smooth' });
+  const parent = element?.parentElement;
+  if (parent?.scrollHeight && parent.scrollHeight > parent.clientHeight) {
+    element?.scrollIntoView({ behavior: 'smooth' });
+  }
 };
 
 export const ConversationHistory = () => {
@@ -28,7 +31,7 @@ export const ConversationHistory = () => {
       {conversationHistory.map(message => (
         <MessageMapper message={message} key={message.id} />
       ))}
-      <div ref={endOfConversationRef} className="pt-10" />
+      <div ref={endOfConversationRef} className="h-6 w-full bg-red-600 pt-10" />
       <ScrollFade />
     </div>
   );
