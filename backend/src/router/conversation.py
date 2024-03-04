@@ -1,14 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
-from langchain.memory import VectorStoreRetrieverMemory
 from langchain.chains import LLMChain
 from ..config import OPENAI_API_KEY, OPENAI_BASE_URL, POSTGRES_CONNECTION_STRING
-from ..memory import Memory
 from ..templates import default
-import datetime
+from ..custom_memory.memory import CustomCombinedMemory
+from langchain_openai import OpenAIEmbeddings
+import uuid
 
 router = APIRouter()
 
@@ -25,18 +25,42 @@ class ConversationResponse(BaseModel):
 
 @router.post("/conversation")
 def conversation(request: ConversationRequest) -> ConversationResponse:
+    message = request.message
+    conversation_id = request.conversation_id
+    user_id = request.user_id
+
     output_parser = StrOutputParser()
     template = default.DEFAULT_TEMPLATE
-    prompt = PromptTemplate(input_variables=["history", "input"], template=template)
-
-    collection_name = request.user_id + request.conversation_id
-    memory: VectorStoreRetrieverMemory = Memory.get_pgvector_memory(
-        connection_string=POSTGRES_CONNECTION_STRING,
-        collection_name=collection_name,
-        k=10,
+    prompt = PromptTemplate(
+        input_variables=["history", "input", "last_messages"], template=template
     )
 
-    relevant_docs = memory.retriever.get_relevant_documents(request.message)
+    custom_memory = CustomCombinedMemory(
+        connection_string=POSTGRES_CONNECTION_STRING,
+        embedding_function=OpenAIEmbeddings(),
+    )
+
+    has_access = custom_memory.check_user_access(
+        user_id=user_id, conversation_id=conversation_id
+    )
+
+    if has_access is False:
+        raise HTTPException(
+            status_code=404,
+            detail="The conversation you are trying to message does not exist",
+        )
+
+    # Long term memory
+    relevant_docs = custom_memory.get_relevant_documents(
+        query=message, conversation_id=conversation_id
+    )
+    relevant_docs = custom_memory.concat_documents(documents=relevant_docs)
+
+    # Short term memory
+    last_messages = custom_memory.get_short_term_memory(conversation_id=conversation_id)
+    last_messages = custom_memory.concat_documents(
+        documents=last_messages if last_messages is not None else []
+    )
 
     llm = ChatOpenAI(
         model="gpt-3.5-turbo",
@@ -48,18 +72,21 @@ def conversation(request: ConversationRequest) -> ConversationResponse:
 
     try:
         output = chain.invoke(
-            input={"input": request.message, "history": relevant_docs},
+            input={
+                "input": message,
+                "history": relevant_docs,
+                "last_messages": last_messages,
+            },
             return_only_outputs=True,
         )
 
         # Save to memory
-        new_docs = memory._form_documents(
-            inputs={"input": request.message}, outputs=output
+        custom_memory.save_conversation(
+            user_id=user_id,
+            conversation_id=uuid.UUID(conversation_id),
+            input=message,
+            output=output["text"],
         )
-
-        ct = datetime.datetime.now()
-        new_docs[0].metadata = {"created_at": ct.timestamp()}
-        memory.retriever.add_documents(new_docs)
 
         # Return response
         return ConversationResponse(message=output["text"])
