@@ -1,3 +1,4 @@
+import { getAccessToken } from '@auth0/nextjs-auth0';
 import ms from 'ms';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -12,6 +13,14 @@ const bodyParser = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const { accessToken } = await getAccessToken();
+
+  if (!accessToken) {
+    return new Response('Unauthorized', {
+      status: 401,
+    });
+  }
+
   const requestBody = await request.json();
   const body = bodyParser.parse(requestBody);
   const { data } = await apiClient.post('/conversation', body, {
