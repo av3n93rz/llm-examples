@@ -6,7 +6,7 @@ import { conversationHistoryAtom, isThinkingAtom } from '@/atoms/atoms';
 import { ConversationClient } from '@/services/conversation';
 import { Author } from '@/types/author';
 
-const conversationId = 'conversation';
+const conversationId = 'd36a3a62-7822-4db7-989d-66b6346fa0bf';
 const userId = 'user';
 
 export const useSendMessage = () => {
